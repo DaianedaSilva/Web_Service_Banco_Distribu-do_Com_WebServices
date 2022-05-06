@@ -10,3 +10,5 @@ Instalar flask: python3-flask
 Rodar aplicação: FLASK_APP=webService.py flask run
 
 Roda na porta 5000
+
+Para realizar um request adicione o campo `x-api-key` no header, passando como valor um toke válido
