@@ -20,4 +20,4 @@ Utilize o comando: `FLASK_APP=<arquivo_da_aplicação> FLASK_RUN_PORT=<porta> fl
  - Servidor de negócio 3: localhost:5003
 
 ## Realizar requests
-Para realizar um request adicione o campo `x-api-key` no header do seu pacote, passando como valor um toke válido  
+Para realizar um request adicione o campo `x-api-key` no header do seu pacote, passando como valor um token válido  
