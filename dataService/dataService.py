@@ -1,5 +1,5 @@
 from datetime import datetime
-from conta import Conta as conta
+import conta
 from flask import Flask
 from requestFilter import api_required
 import logging
@@ -26,7 +26,7 @@ contas = [conta1, conta2, conta3, conta4, conta5,
 operacoes = 0
 
 app = Flask(__name__)
-app.run(debug=True)
+app.run(debug=True, port = 5000)
 
 def tokenIsValid(token):
     if token in tokens:
@@ -44,7 +44,7 @@ def findConta(id_conta):
 # É PASSADO O ID DA CONTA, BUSCADO NO BANCO OU JA É PASSADO DIRETO A CONTA?
 
 @api_required
-@app.route('/<acnt>>',methods=['POST'])
+@app.route('/<acnt>',methods=['POST'])
 def getSaldo(id_negocio, id_conta, token):
     if(not tokenIsValid(token)):
         print("Token invalido")
