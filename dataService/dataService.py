@@ -36,7 +36,7 @@ app.run(debug=True, port=5000)
 
 
 # Funções base
-def findConta(id_conta):
+def _findConta(id_conta):
     for conta in contas:
         if (conta.getId() == id_conta):
             return conta
@@ -44,20 +44,26 @@ def findConta(id_conta):
     return -1
 
 
-# getLock -> verifica se a conta esta travada
-# retorna -1 se estiver travada, ou seja se lock == True
-# CONTA É OQ:? UM ID, A CONTA JA? PRECISA BUSCAR
-
-
 def _getLock(conta):
     if(conta.isLock()):
-        print("Conta travada por outro servidor de negocio")
         return -1
+    return 0
 
-# Destrava a conta
 
+# Rotas web
+@app.route('/<acnt>/unlock', methods=['POST'])
+@api_required
+def unLock(acnt):
+    id_negocio = tokens.index(request.headers.get("x-api-key")) + 1
+    acnt = int(acnt)
+    conta = _findConta(acnt)
 
-def _unLock(id_negocio, conta):
+    if(conta == -1):
+        return {"mensagem": "Conta não encontrada"}, 404
+
+    if (_getLock(conta) == 0):
+        return {"mensagem": "Conta não bloqueada"}, 400
+    
     global operacoes
     operacoes = operacoes + 1
 
@@ -67,11 +73,21 @@ def _unLock(id_negocio, conta):
                  " TipoOperação: " + "unlockConta" +
                  " Conta: " + str(conta.getId()))
     conta.unLockConta()
+    return {}, 200
 
-# Trava a conta - SO TEM FUNÇÃO PRA DESBLOQUEAR E VERIFICAR O VALOR DA VARIÁVEL, O GET LOCK DEVE TRANCAR?
 
+@app.route('/<acnt>/lock', methods=['POST'])
+@api_required
+def lock(acnt):
+    id_negocio = tokens.index(request.headers.get("x-api-key")) + 1
+    acnt = int(acnt)
+    conta = _findConta(acnt)
 
-def _lock(id_negocio, conta):
+    if(conta == -1):
+        return {"mensagem": "Conta não encontrada"}, 404
+    if (_getLock(conta) == -1):
+        return {"mensagem": "Conta bloqueada"}, 423
+
     global operacoes
     operacoes = operacoes + 1
 
@@ -82,20 +98,22 @@ def _lock(id_negocio, conta):
                  " Conta: " + str(conta.getId()))
 
     conta.lockConta()
+    return {}, 200
 
 
-# Rotas web
 @app.route('/<acnt>', methods=['GET'])
 @api_required
 def getSaldo(acnt):
-    global operacoes
-    operacoes = operacoes + 1
     id_negocio = tokens.index(request.headers.get("x-api-key")) + 1
     acnt = int(acnt)
-    conta = findConta(acnt)
+    conta = _findConta(acnt)
 
     if(conta == -1):
         return {"mensagem": "Conta não encontrada"}, 404
+
+    global operacoes
+    operacoes = operacoes + 1
+
     logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
                  " NumOperação: " + str(operacoes) +
                  " ID Servidor Negócio: " + str(id_negocio) +
@@ -112,17 +130,12 @@ def setSaldo(acnt, amt):
     id_negocio = tokens.index(request.headers.get("x-api-key")) + 1
 
     acnt = int(acnt)
-    conta = findConta(acnt)
+    conta = _findConta(acnt)
 
     amt = int(amt)
 
     if(conta == -1):
         return {"mensagem": "Conta não encontrada"}, 404
-
-    if (_getLock(conta) == -1):
-        return {"mensagem": "Conta bloqueada"}, 423
-
-    _lock(id_negocio, conta)
 
     global operacoes
     operacoes = operacoes + 1
@@ -135,6 +148,5 @@ def setSaldo(acnt, amt):
                  " TipoOperação: " + "setSaldo" +
                  " Conta: " + str(acnt) +
                  " Valor: " + str(amt))
-    
-    _unLock(id_negocio, conta)
+
     return {"Saldo": conta.getSaldo()}, 200
