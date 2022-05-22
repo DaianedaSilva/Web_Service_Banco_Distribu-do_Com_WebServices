@@ -17,10 +17,10 @@ class Conta:
         self._saldo = novoSaldo
 
     def isLock(self):
-        return self.lock
+        return self._lock
 
     def lockConta(self):
-        self.lock = True
+        self._lock = True
 
     def unLockConta(self):
-        self.lock = False
+        self._lock = False

@@ -49,23 +49,38 @@ def findConta(id_conta):
 # CONTA É OQ:? UM ID, A CONTA JA? PRECISA BUSCAR
 
 
-def _getLock(id_negoc, conta):
-    if(conta._lock):
+def _getLock(conta):
+    if(conta.isLock()):
         print("Conta travada por outro servidor de negocio")
         return -1
 
 # Destrava a conta
 
 
-def _unLock(id_negoc, conta):
-    print("Destravando a conta")
+def _unLock(id_negocio, conta):
+    global operacoes
+    operacoes = operacoes + 1
+
+    logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                 " NumOperação: " + str(operacoes) +
+                 " ID Servidor Negócio: " + str(id_negocio) +
+                 " TipoOperação: " + "unlockConta" +
+                 " Conta: " + str(conta.getId()))
     conta.unLockConta()
 
 # Trava a conta - SO TEM FUNÇÃO PRA DESBLOQUEAR E VERIFICAR O VALOR DA VARIÁVEL, O GET LOCK DEVE TRANCAR?
 
 
-def _lock(id_negoc, conta):
-    print("Travando a conta")
+def _lock(id_negocio, conta):
+    global operacoes
+    operacoes = operacoes + 1
+
+    logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                 " NumOperação: " + str(operacoes) +
+                 " ID Servidor Negócio: " + str(id_negocio) +
+                 " TipoOperação: " + "lockConta" +
+                 " Conta: " + str(conta.getId()))
+
     conta.lockConta()
 
 
@@ -85,33 +100,41 @@ def getSaldo(acnt):
                  " NumOperação: " + str(operacoes) +
                  " ID Servidor Negócio: " + str(id_negocio) +
                  " TipoOperação: " + "getSaldo" +
-                 " Conta: " + str(acnt) +
-                 " Valor: " + str(conta.getSaldo()))
+                 " Conta: " + str(acnt))
 
     return {"Saldo": conta.getSaldo()}, 200
 
 
-@api_required
 @app.route('/<acnt>/<amt>', methods=['POST'])
-def setSaldo(id_negoc, id_conta, valor, token):
-    conta = findConta(id_conta)
+@api_required
+def setSaldo(acnt, amt):
+
+    id_negocio = tokens.index(request.headers.get("x-api-key")) + 1
+
+    acnt = int(acnt)
+    conta = findConta(acnt)
+
+    amt = int(amt)
 
     if(conta == -1):
-        return -1
+        return {"mensagem": "Conta não encontrada"}, 404
 
-    if (_getLock(id_negoc, conta) == -1):
-        return -1
+    if (_getLock(conta) == -1):
+        return {"mensagem": "Conta bloqueada"}, 423
 
-    _lock(id_negoc, conta)
+    _lock(id_negocio, conta)
 
-    conta._saldo = valor
+    global operacoes
+    operacoes = operacoes + 1
 
-    _unLock(id_negoc, conta)
+    conta.setSaldo(conta.getSaldo()+amt)
 
-    logging.info("TIMESTAMP: " + datetime.now +
-                 " NumOperação: " + operacoes +
-                 " ID Servidor Negócio: " + id_negoc +
+    logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                 " NumOperação: " + str(operacoes) +
+                 " ID Servidor Negócio: " + str(id_negocio) +
                  " TipoOperação: " + "setSaldo" +
-                 " Conta: " + id_conta +
-                 " Valor: " + conta.getSaldo)
-    print("valor da conta: ", conta._saldo)
+                 " Conta: " + str(acnt) +
+                 " Valor: " + str(amt))
+    
+    _unLock(id_negocio, conta)
+    return {"Saldo": conta.getSaldo()}, 200
