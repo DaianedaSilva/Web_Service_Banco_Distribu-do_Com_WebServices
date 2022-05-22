@@ -1,3 +1,4 @@
+import json
 from requestFilter import api_required
 from flask import Flask, request
 from datetime import datetime
@@ -28,26 +29,33 @@ app = Flask(__name__)
 app.run(debug=True, port=5001)
 
 # Funções base
+
+
 def _lockConta(acnt):
     return requests.post(url=dataServer+acnt+lock, headers=headers)
+
 
 def _unlockConta(acnt):
     return requests.post(url=dataServer+acnt+unlock, headers=headers)
 
-def _setSaldo(acnt):
+
+def _getSaldo(acnt):
     return requests.get(url=dataServer+acnt, headers=headers)
 
-def _setSaldo(acnt,amt):
+
+def _setSaldo(acnt, amt):
     return requests.post(url=dataServer+acnt+'/'+amt, headers=headers)
 
 # Rotas web
+
+
 @app.route('/deposito/<acnt>/<amt>', methods=['POST'])
 @api_required
 def deposito(acnt, amt):
     id_cliente = tokens.index(request.headers.get("x-api-key")) + 1
 
-    if(int(amt)<= 0 ):
-        return{"mensagem":"Valor inválido"}, 400
+    if(int(amt) <= 0):
+        return{"mensagem": "Valor inválido"}, 400
 
     lockRespopnse = _lockConta(acnt)
     if(lockRespopnse.status_code != 200):
@@ -55,7 +63,7 @@ def deposito(acnt, amt):
 
     global operacoes
     operacoes = operacoes + 1
-    depositResponse = _setSaldo(acnt,amt)
+    depositResponse = _setSaldo(acnt, amt)
     logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
                  " NumOperação: " + str(operacoes) +
                  " ID Cliente: " + str(id_cliente) +
@@ -71,23 +79,85 @@ def deposito(acnt, amt):
 @app.route('/saque/<acnt>/<amt>', methods=['POST'])
 @api_required
 def saque(acnt, amt):
-    str = 'saque de ' + acnt + ' para' + amt
-    logging.info(str)
-    return str
+    id_cliente = tokens.index(request.headers.get("x-api-key")) + 1
+
+    if(int(amt) <= 0):
+        return{"mensagem": "Valor inválido"}, 400
+
+    saldoConta = int(json.loads(_getSaldo(acnt).text)["Saldo"])
+
+    if(int(int(amt) > saldoConta)):
+        return{"mensagem": "Saldo insuficiente"}, 400
+
+    lockRespopnse = _lockConta(acnt)
+    if(lockRespopnse.status_code != 200):
+        return {"mensagem": "Conta bloqueada"}, 423
+
+    global operacoes
+    operacoes = operacoes + 1
+    depositResponse = _setSaldo(acnt, str(int(amt)*-1))
+    logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                 " NumOperação: " + str(operacoes) +
+                 " ID Cliente: " + str(id_cliente) +
+                 " TipoOperação: " + "deposito" +
+                 " Conta: " + str(acnt) +
+                 " Valor: " + str(amt))
+
+    unlockRespoonse = _unlockConta(acnt)
+
+    return depositResponse.content, 200
 
 
 @app.route('/saldo/<acnt>', methods=['GET'])
 @api_required
 def saldo(acnt):
-    str = 'Saldo de ' + acnt
-    logging.info(str)
-    return str
+    id_cliente = tokens.index(request.headers.get("x-api-key")) + 1
+    global operacoes
+    operacoes = operacoes + 1
+    logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                 " NumOperação: " + str(operacoes) +
+                 " ID Cliente: " + str(id_cliente) +
+                 " TipoOperação: " + "saldo" +
+                 " Conta: " + str(acnt))
+    return _getSaldo(acnt).content, 200
 
 
 @app.route('/transferencia/<acnt_orig>/<acnt_dest>/<amt>', methods=['POST'])
 @api_required
 def transferencia(acnt_orig, acnt_dest,  amt):
-    str = 'transferencia de ' + acnt_orig + \
-        " para " + acnt_dest + " no valor de " + amt
-    logging.info(str)
-    return str
+    id_cliente = tokens.index(request.headers.get("x-api-key")) + 1
+
+    if(int(amt) <= 0):
+        return{"mensagem": "Valor inválido"}, 400
+
+    saldoConta1 = int(json.loads(_getSaldo(acnt_orig).text)["Saldo"])
+
+    if(int(int(amt) > saldoConta1)):
+        return{"mensagem": "Saldo insuficiente"}, 400
+
+    lockRespopnse1 = _lockConta(acnt_orig)
+    if(lockRespopnse1.status_code != 200):
+        return {"mensagem": "Conta bloqueada"}, 423
+
+    lockRespopnse2 = _lockConta(acnt_dest)
+    if(lockRespopnse2.status_code != 200):
+        unlockRespoonse2 = _unlockConta(acnt_orig)
+        return {"mensagem": "Conta bloqueada"}, 423
+
+    global operacoes
+    operacoes = operacoes + 1
+    depositResponse1 = _setSaldo(acnt_orig, str(int(amt)*-1))
+    depositResponse2 = _setSaldo(acnt_dest, str(int(amt)))
+    logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
+                 " NumOperação: " + str(operacoes) +
+                 " ID Cliente: " + str(id_cliente) +
+                 " TipoOperação: " + "deposito" +
+                 " Conta1: " + str(acnt_orig) +
+                 " Conta2: " + str(acnt_dest) +
+                 " Valor: " + str(amt))
+    saldoConta1 = int(json.loads(depositResponse1.text)["Saldo"])
+    saldoConta2 = int(json.loads(depositResponse2.text)["Saldo"])
+    unlockRespoonse1 = _unlockConta(acnt_orig)
+    unlockRespoonse2 = _unlockConta(acnt_dest)
+
+    return {"Saldo1": saldoConta1, "Saldo2": saldoConta2}, 200
