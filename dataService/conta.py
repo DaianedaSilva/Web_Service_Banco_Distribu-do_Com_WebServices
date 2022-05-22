@@ -7,6 +7,12 @@ class Conta:
         self._saldo = saldo
         self._lock = False
 
+    def getId(self):
+        return self._id
+
+    def getSaldo(self):
+        return self._saldo
+
     def setSaldo(self,novoSaldo):
         self._saldo = novoSaldo
 
