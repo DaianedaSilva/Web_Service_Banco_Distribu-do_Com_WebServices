@@ -57,13 +57,16 @@ def deposito(acnt, amt):
     if(int(amt) <= 0):
         return{"mensagem": "Valor inválido"}, 400
 
-    lockRespopnse = _lockConta(acnt)
-    if(lockRespopnse.status_code != 200):
-        return {"mensagem": "Conta bloqueada"}, 423
+    lockResponse = _lockConta(acnt)
+    if(lockResponse.status_code != 200):
+        return lockResponse.content, lockResponse.status_code
+
+    depositoResponse = _setSaldo(acnt, amt)
+    if (depositoResponse.status_code != 200):
+        return depositoResponse.content, depositoResponse.status_code
 
     global operacoes
     operacoes = operacoes + 1
-    depositResponse = _setSaldo(acnt, amt)
     logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
                  " NumOperação: " + str(operacoes) +
                  " ID Cliente: " + str(id_cliente) +
@@ -73,7 +76,7 @@ def deposito(acnt, amt):
 
     unlockRespoonse = _unlockConta(acnt)
 
-    return depositResponse.content, 200
+    return depositoResponse.content, depositoResponse.status_code
 
 
 @app.route('/saque/<acnt>/<amt>', methods=['POST'])
@@ -84,18 +87,25 @@ def saque(acnt, amt):
     if(int(amt) <= 0):
         return{"mensagem": "Valor inválido"}, 400
 
-    saldoConta = int(json.loads(_getSaldo(acnt).text)["Saldo"])
+    saldoResponse = _getSaldo(acnt)
+    if (saldoResponse.status_code != 200):
+        return saldoResponse.content, saldoResponse.status_code
+
+    saldoConta = int(json.loads(saldoResponse.text)["Saldo"])
 
     if(int(int(amt) > saldoConta)):
         return{"mensagem": "Saldo insuficiente"}, 400
 
-    lockRespopnse = _lockConta(acnt)
-    if(lockRespopnse.status_code != 200):
-        return {"mensagem": "Conta bloqueada"}, 423
+    lockResponse = _lockConta(acnt)
+    if(lockResponse.status_code != 200):
+        return lockResponse.content, lockResponse.status_code
+
+    saqueResponse = _setSaldo(acnt, str(int(amt)*-1))
+    if (saqueResponse.status_code != 200):
+        return saqueResponse.content, saqueResponse.status_code
 
     global operacoes
     operacoes = operacoes + 1
-    depositResponse = _setSaldo(acnt, str(int(amt)*-1))
     logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
                  " NumOperação: " + str(operacoes) +
                  " ID Cliente: " + str(id_cliente) +
@@ -105,13 +115,18 @@ def saque(acnt, amt):
 
     unlockRespoonse = _unlockConta(acnt)
 
-    return depositResponse.content, 200
+    return saqueResponse.content, saqueResponse.status_code
 
 
 @app.route('/saldo/<acnt>', methods=['GET'])
 @api_required
 def saldo(acnt):
     id_cliente = tokens.index(request.headers.get("x-api-key")) + 1
+
+    saldoResponse = _getSaldo(acnt)
+    if saldoResponse.status_code != 200:
+        return saldoResponse.content, saldoResponse.status_code
+
     global operacoes
     operacoes = operacoes + 1
     logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
@@ -119,7 +134,8 @@ def saldo(acnt):
                  " ID Cliente: " + str(id_cliente) +
                  " TipoOperação: " + "saldo" +
                  " Conta: " + str(acnt))
-    return _getSaldo(acnt).content, 200
+
+    return saldoResponse.content, saldoResponse.status_code
 
 
 @app.route('/transferencia/<acnt_orig>/<acnt_dest>/<amt>', methods=['POST'])
@@ -130,24 +146,35 @@ def transferencia(acnt_orig, acnt_dest,  amt):
     if(int(amt) <= 0):
         return{"mensagem": "Valor inválido"}, 400
 
-    saldoConta1 = int(json.loads(_getSaldo(acnt_orig).text)["Saldo"])
+    saldoResponse1 = _getSaldo(acnt_orig)
+    if(saldoResponse1.status_code != 200):
+        return saldoResponse1.content, saldoResponse1.status_code
 
-    if(int(int(amt) > saldoConta1)):
+    saldoConta1 = int(json.loads(saldoResponse1.text)["Saldo"])
+    if(int(amt) > saldoConta1):
         return{"mensagem": "Saldo insuficiente"}, 400
 
     lockRespopnse1 = _lockConta(acnt_orig)
     if(lockRespopnse1.status_code != 200):
-        return {"mensagem": "Conta bloqueada"}, 423
+        return lockRespopnse1.content, lockRespopnse1.status_code
 
     lockRespopnse2 = _lockConta(acnt_dest)
     if(lockRespopnse2.status_code != 200):
         unlockRespoonse2 = _unlockConta(acnt_orig)
-        return {"mensagem": "Conta bloqueada"}, 423
+        return lockRespopnse2.content, lockRespopnse2.status_code
+
+    saqueResponse = _setSaldo(acnt_orig, str(int(amt)*-1))
+    if saqueResponse.status_code != 200:
+        return saqueResponse.content, saqueResponse.status_code
+
+    depositoResponse = _setSaldo(acnt_dest, str(int(amt)))
+    if depositoResponse.status_code != 200:
+        depositoResponse = _setSaldo(acnt_orig, str(int(amt)))
+        return depositoResponse.content, depositoResponse.status_code
 
     global operacoes
     operacoes = operacoes + 1
-    depositResponse1 = _setSaldo(acnt_orig, str(int(amt)*-1))
-    depositResponse2 = _setSaldo(acnt_dest, str(int(amt)))
+
     logging.info("TIMESTAMP: " + datetime.now().strftime("%d/%m/%Y, %H:%M:%S") +
                  " NumOperação: " + str(operacoes) +
                  " ID Cliente: " + str(id_cliente) +
@@ -155,8 +182,8 @@ def transferencia(acnt_orig, acnt_dest,  amt):
                  " Conta1: " + str(acnt_orig) +
                  " Conta2: " + str(acnt_dest) +
                  " Valor: " + str(amt))
-    saldoConta1 = int(json.loads(depositResponse1.text)["Saldo"])
-    saldoConta2 = int(json.loads(depositResponse2.text)["Saldo"])
+    saldoConta1 = int(json.loads(saqueResponse.text)["Saldo"])
+    saldoConta2 = int(json.loads(depositoResponse.text)["Saldo"])
     unlockRespoonse1 = _unlockConta(acnt_orig)
     unlockRespoonse2 = _unlockConta(acnt_dest)
 

@@ -40,7 +40,6 @@ def _findConta(id_conta):
     for conta in contas:
         if (conta.getId() == id_conta):
             return conta
-    print("conta inexistente")
     return -1
 
 
