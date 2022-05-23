@@ -1,9 +1,9 @@
-import json
 from requestFilter import api_required
 from flask import Flask, request
 from datetime import datetime
 import requests
 import logging
+import json
 
 # Inicialização dos dados base para o servidor
 tokenCliente1 = "6f986d8b-7cd7-4a2b-b645-5791f7b52ea8"

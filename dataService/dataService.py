@@ -1,8 +1,8 @@
-from datetime import datetime
-import conta
-from flask import Flask, request
 from requestFilter import api_required
+from flask import Flask, request
+from datetime import datetime
 import logging
+import conta
 
 # Inicialização dos dados base para o servidor
 tokenServidor1 = "9cdcaba2-2e76-4a34-ae0a-3b3d54e0002d"
